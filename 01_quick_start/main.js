@@ -1,10 +1,15 @@
 const { app, BrowserWindow } = require('electron')
 
+const path = require('node:path')
+
 // 创建一个新窗口
 const createWindow = () => {
     const win = new BrowserWindow({
         width: 800,
-        height: 600
+        height: 600,
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js')
+        }
     })
     // 把 index.html 页面加载到窗口中
     win.loadFile('index.html')
@@ -16,7 +21,7 @@ app.whenReady().then(() => {
     // 适配 MacOS
     app.on('activate', () => {
         // Mac 中有可能出现程序正在运行但没有窗口的情况
-        if (BrowserWindow.getAllWindows.length === 0) createWindow()
+        if (BrowserWindow.getAllWindows().length === 0) createWindow()
     })
 })
 
