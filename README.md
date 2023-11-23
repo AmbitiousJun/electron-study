@@ -2,7 +2,9 @@
 
 此仓库用来存放个人学习 electron 工具的笔记和练习代码
 
-> 官方文档：https://www.electronjs.org/docs/latest/tutorial/quick-start
+> 官方文档：[https://www.electronjs.org/docs/latest/tutorial/quick-start](https://www.electronjs.org/docs/latest/tutorial/quick-start)
+> 
+> 仓库地址：[GitHub - AmbitiousJun/electron-study: electron 学习仓库，包含笔记和代码](https://github.com/AmbitiousJun/electron-study)
 
 ## 1. 快速入门程序
 
@@ -212,5 +214,146 @@ npx electron-forge import
 ```shell
 npm run make
 ```
+
+## 2. 预加载脚本的使用
+
+### 2.1 什么是预加载脚本
+
+electron 应用程序通常包含两个进程，一个是主进程，另一个是渲染进程，渲染进程用来运行渲染 web 页面，为了安全性，在渲染进程中不能访问到 Node.js 的 API，而主进程中是可以完全访问整个操作系统以及通过 npm 安装的任何依赖。
+
+要将不同的进程类型连接到一起，就需要使用到**预加载脚本（preload script）**。
+
+### 2.2 如何使用预加载脚本来增强渲染进程
+
+在预加载脚本中，我们能够访问到 HTML DOM 元素以及一部分的 Node.js 和 Electron 的 API
+
+> **预加载脚本沙盒：**
+> 
+> 从 Electron 20 版本之后，预加载脚本都默认运行在沙盒中，并且不再能够访问完整的 Node.js 环境。
+> 
+> 我们只能通过一个预先填充好的 `require` 函数来访问这部分 API
+> 
+> | 可用 API      | 详情                                            |
+> | ----------- | --------------------------------------------- |
+> | Electron 模块 | 渲染进程                                          |
+> | Node.js 模块  | events, timers, url                           |
+> | 预填充全局变量     | Buffer, process, clearImmediate, setImmediate |
+
+可以通过 `contextBridge` API 来实现在渲染进程中直接访问 electron 全局变量
+
+首先，还是一样创建一个 `preload.js` 文件，引入 `contextBridge` 依赖，导出 node, chrome, electron 的版本号：
+
+```js
+const { contextBridge } = require('electron')
+
+contextBridge.exposeInMainWorld("versions", {
+  node: () => process.versions.node,
+  chrome: () => process.versions.chrome,
+  electron: () => process.versions.electron
+})
+```
+
+接着，在 `main.js` 中引入 `preload.js` ，代码与第一章节一样，这里不再贴出来
+
+最后，在 html 页面中，可以直接在全局变量 `versions` 中取到版本号：
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>preload 脚本的使用</title>
+</head>
+<body>
+  <h1>Hello from Electron renderer!</h1>
+  <p>👋</p>
+  <p id="info"></p>
+
+  <script>
+    // 直接在渲染进程中读取通过 contextBridge 暴露的全局变量
+    const info = document.getElementById('info')
+    info.innerText = `This app is using Chrome (v${versions.chrome()}), Node.js (v${versions.node()}), and Electron (v${versions.electron()})`
+  </script>
+</body>
+</html>
+```
+
+运行程序，查看效果如下：
+
+![](assets/2023-11-23-14-29-48-image.png)
+
+### 2.3 如何在主进程和渲染进程之间通信
+
+上文提到，electron 的主进程和渲染进程有自己独立的职责，它们之间是无法进行交互的。
+
+也就是说，在**渲染进程**中无法直接访问 Node.js 的 API，在**主进程**中也无法访问 HTML DOM。
+
+electron 提供了两个模块：`ipcMain` 和 `ipcRenderer` ，ipc 的含义是进程间通信（inter-process communication）。
+
+在渲染进程，可以借助上一小节提到的 preload 脚本，以及 `ipcRenderer.invoke()` 方法触发一个处理器，这个方法返回一个 Promise 对象。
+
+在主进程中，可以通过 `ipcMain.handle()` 方法来定义一个处理器，两个进程就能实现通信。
+
+下面来写一个进程通信例子：
+
+首先，在 preload 脚本中添加一个全局变量
+
+```js
+const { contextBridge, ipcRenderer } = require('electron')
+
+contextBridge.exposeInMainWorld("versions", {
+  // 这里不能直接把整个 ipcRenderer 暴露给渲染进程，防止产生代码安全隐患
+  ping: () => ipcRenderer.invoke('ping')
+})
+```
+
+> 这里务必要把 ipcRenderer 模块通过辅助函数的形式包裹起来，防止整个模块都暴露到渲染进程中，否则在渲染进程中，就能随意发送信息给主进程，进而带来安全隐患
+
+接着，在 `main.js` 中，定义一个处理器
+
+```js
+const { app, BrowserWindow, ipcMain } = require('electron')
+
+const path = require('node:path')
+
+const createWindow = () => {
+  const win = new BrowserWindow({
+    width: 800,
+    height: 600,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js')
+    }
+  })
+  win.loadFile('index.html')
+}
+
+app.whenReady().then(() => {
+  // 处理渲染进程的 ping 事件
+  ipcMain.handle('ping', () => 'pong')
+  createWindow()
+})
+```
+
+> 这里要确保处理器的定义位置是在创建窗口读取 html 文件之前，确保渲染进程调用 `invoke` 方法的时候主进程是准备好处理的
+
+完成以上步骤之后，我们就可以在渲染进程中开始与主进程进行通信了
+
+```js
+// 调用 ping，与主进程进行通信
+const func = async () => {
+  const response = await window.versions.ping()
+  alert(response)
+}
+func()
+```
+
+运行程序，查看结果：
+
+![](assets/2023-11-23-14-56-08-image.png)
+
+> 总结：
+> 
+> preload 脚本是主进程与渲染进程的中间层，脚本中的代码会在 web 页面被加载到 browser window 之前进行调用。preload 脚本既能访问 DOM API 也能访问 Node.js 环境变量。通过 `contextBridge` API，可以把一些 Node.js 环境变量暴露给渲染进程使用。
 
 

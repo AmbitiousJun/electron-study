@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'"> -->
+  <title>preload 脚本的使用</title>
+</head>
+<body>
+  <h1>Hello from Electron renderer!</h1>
+  <p>👋</p>
+  <p id="info"></p>
+
+  <script>
+    // 直接在渲染进程中读取通过 contextBridge 暴露的全局变量
+    const info = document.getElementById('info')
+    info.innerText = `This app is using Chrome (v${versions.chrome()}), Node.js (v${versions.node()}), and Electron (v${versions.electron()})`
+
+    // 调用 ping，与主进程进行通信
+    const func = async () => {
+      const response = await window.versions.ping()
+      alert(response)
+      window.versions.quit()
+    }
+    func()
+  </script>
+</body>
+</html>
