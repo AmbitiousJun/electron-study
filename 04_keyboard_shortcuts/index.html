@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>键盘快捷键监听</title>
+</head>
+<body>
+  <h1>Hello World!</h1>
+  <h2 id="keyboard-event-tip"></h2>
+
+  <script>
+    const tip = document.getElementById('keyboard-event-tip')
+    window.listeners.onHelpMenuClick(() => {
+      tip.innerText = 'Help Menu Triggered!'
+    })
+  </script>
+</body>
+</html>

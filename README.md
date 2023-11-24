@@ -537,4 +537,63 @@ app.on('window-all-closed', () => process.platform !== 'darwin' && app.quit())
 
 ![](assets/2023-11-24-11-50-12-image.png)
 
+## 4. 练习：键盘快捷键监听
 
+还是和之前一样，我们先编写一个基础的程序
+
+`main.js` :
+
+```js
+const { app, BrowserWindow } = require('electron')
+
+const createWindow = () => {
+  const win = new BrowserWindow({
+    width: 800,
+    height: 600
+  })
+  win.loadFile('index.html')
+}
+
+app.whenReady().then(() => {
+  createWindow()
+  app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && createWindow())
+})
+
+app.on('window-all-closed', () => process.platform !== 'darwin' && app.quit())
+```
+
+`index.html` :
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>键盘快捷键监听</title>
+</head>
+<body>
+  <h1>Hello World!</h1>
+</body>
+</html>
+```
+
+### 4.1 局部监听
+
+局部监听就是当程序处于激活状态而不是位于后台的时候能够监听到的快捷键
+
+通常是配合程序的顶部菜单来实现，即给顶部的菜单分配一个快捷键
+
+具体实现如下：
+
+首先，在 `main.js` 中创建一个新的菜单 `Electron` 和一个子菜单 `Help`
+
+子菜单通过 `accelerator` 属性来绑定键盘快捷键，在本例中，绑定的是 Windows 和 Linux 系统的 `Alt+Control+I` 组合键，MacOS 系统的 `Alt+Cmd+I` 组合键
+
+`click` 属性接收一个函数，这个函数就是用户按下组合键或者直接点击子菜单时触发，我们在函数体中通过 `win.webContents` 对象，从**主进程向 win 窗口所在的渲染进程发送一条消息**，表示事件触发。
+
+```
+
+```
+
+同样地，为了要在渲染进程中监听到主进程发来的消息，需要借助预加载脚本的 `contextBridge` 模块来封装一个辅助函数
