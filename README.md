@@ -356,4 +356,185 @@ func()
 > 
 > preload 脚本是主进程与渲染进程的中间层，脚本中的代码会在 web 页面被加载到 browser window 之前进行调用。preload 脚本既能访问 DOM API 也能访问 Node.js 环境变量。通过 `contextBridge` API，可以把一些 Node.js 环境变量暴露给渲染进程使用。
 
+## 3. 练习：暗黑高亮模式切换
+
+> 知识要点：
+> 
+> 在 electron 中实现暗黑高亮模式切换，可以借助一个 CSS 的 media query：`prefers-color-scheme`，定义两套不同的 body UI。
+> 
+> 在主进程中，通过 `nativeTheme` 模块可以获取和修改当前应用使用的主题
+
+### 3.1 搭建基础应用
+
+首先我们写一个基础的 `main.js` 和 `index.html` 文件，展示一个基础的应用出来：
+
+`main.js` :
+
+```js
+const { app, BrowserWindow } = require('electron')
+
+const createWindow = () => {
+  const win = new BrowserWindow({
+    width: 800,
+    height: 600
+  })
+  win.loadFile('index.html')
+}
+
+app.whenReady().then(() => {
+  createWindow()
+  app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && createWindow())
+})
+
+app.on('window-all-closed', () => process.platform !== 'darwin' && app.quit())
+```
+
+`index.html` :
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>暗黑高亮主题切换练习</title>
+</head>
+<body>
+  <h1>Hello World!</h1>
+  <p>Current theme source: <strong id="theme-source">System</strong></p>
+
+  <button id="toggle-dark-mode">Toggle Dark Mode</button>
+  <button id="reset-to-system">Reset to System Theme</button>
+</body>
+</html>
+```
+
+### 3.2 定义深色、亮色主题样式
+
+在根目录中创建一个 `style.css` 文件，并定义主题样式，使用 `prefer-color-scheme` media query
+
+`style.css` :
+
+```css
+:root {
+  color-scheme: light dark;
+}
+
+/* 暗黑主题 */
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #333;
+    color: white;
+  }
+}
+
+/* 亮色主题 */
+@media (prefers-color-scheme: light) {
+  body {
+    background: #f6f6f6;
+    color: black;
+  }
+}
+```
+
+在 `index.html` 文件中引入该样式
+
+![](assets/2023-11-24-11-48-31-image.png)
+
+### 3.3 编写预加载脚本
+
+在预加载脚本中，借助 `ipcRenderer` 和 `contextBridge` 往渲染进程中暴露两个方法，分别是切换当前应用的主题样式，以及重置主题为系统默认
+
+`preload.js` :
+
+```js
+const { ipcRenderer, contextBridge } = require('electron')
+
+contextBridge.exposeInMainWorld('darkMode', {
+  toggle() { return ipcRenderer.invoke('dark-mode:toggle') },
+  system() { return ipcRenderer.invoke('dark-mode:system') }
+})
+```
+
+在 `main.js` 中引入 `preload.js` ，并借助 `nativeTheme` 模块实现 toggle 和 system 两个事件处理器
+
+`main.js` :
+
+```js
+const { app, BrowserWindow, ipcMain, nativeTheme } = require('electron')
+
+const path = require('node:path')
+
+const createWindow = () => {
+  const win = new BrowserWindow({
+    width: 800,
+    height: 600,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js")
+    }
+  })
+  win.loadFile('index.html')
+}
+
+app.whenReady().then(() => {
+  // 处理主题切换事件
+  ipcMain.handle('dark-mode:toggle', () => {
+    nativeTheme.themeSource = nativeTheme.shouldUseDarkColors ? 'light' : 'dark'
+    return nativeTheme.shouldUseDarkColors
+  })
+  // 处理系统默认主题事件
+  ipcMain.handle('dark-mode:system', () => {
+    nativeTheme.themeSource = 'system'
+  })
+
+  createWindow()
+  app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && createWindow())
+})
+
+app.on('window-all-closed', () => process.platform !== 'darwin' && app.quit())
+```
+
+在 `index.html` 中添加按钮点击事件，调用预加载脚本提供的两个辅助方法实现主题切换
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>暗黑高亮主题切换练习</title>
+  <link rel="stylesheet" type="text/css" href="./style.css"></link>
+</head>
+<body>
+  <h1>Hello World!</h1>
+  <p>Current theme source: <strong id="theme-source">System</strong></p>
+
+  <button id="toggle-dark-mode" onclick="toggle()">Toggle Dark Mode</button>
+  <button id="reset-to-system" onclick="system()">Reset to System Theme</button>
+
+  <script>
+    const themeSource = document.getElementById('theme-source')
+    // 暗、亮主题切换
+    const toggle = async () => {
+      const isDark = await window.darkMode.toggle()
+      themeSource.innerHTML = isDark ? 'Dark' : 'Light'
+    }
+    // 设置为系统当前主题
+    const system = async () => {
+      await window.darkMode.system()
+      themeSource.innerHTML = 'System'
+    }
+  </script>
+</body>
+</html>
+```
+
+### 3.3 运行程序，查看效果
+
+![](assets/2023-11-24-11-49-50-image.png)
+
+![](assets/2023-11-24-11-50-01-image.png)
+
+![](assets/2023-11-24-11-50-12-image.png)
+
 

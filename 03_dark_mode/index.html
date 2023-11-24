@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';" />
+  <title>暗黑高亮主题切换练习</title>
+  <link rel="stylesheet" type="text/css" href="./style.css"></link>
+</head>
+<body>
+  <h1>Hello World!</h1>
+  <p>Current theme source: <strong id="theme-source">System</strong></p>
+
+  <button id="toggle-dark-mode" onclick="toggle()">Toggle Dark Mode</button>
+  <button id="reset-to-system" onclick="system()">Reset to System Theme</button>
+
+  <script>
+    const themeSource = document.getElementById('theme-source')
+    // 暗、亮主题切换
+    const toggle = async () => {
+      const isDark = await window.darkMode.toggle()
+      themeSource.innerHTML = isDark ? 'Dark' : 'Light'
+    }
+    // 设置为系统当前主题
+    const system = async () => {
+      await window.darkMode.system()
+      themeSource.innerHTML = 'System'
+    }
+  </script>
+</body>
+</html>
