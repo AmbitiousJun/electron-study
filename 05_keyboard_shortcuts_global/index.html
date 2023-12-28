@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>键盘全局监听快捷键</title>
+</head>
+<body>
+  
+  <h2>测试键盘全局监听快捷键</h2>
+  <h3 id="shortcut-listen-text"></h3>
+
+  <script>
+    const t = document.getElementById('shortcut-listen-text')
+    let count = 0
+    globalShortcut.altControlG(() => {
+      t.innerText = `全局键盘快捷键触发了 ${++count} 次`
+    })
+  </script>
+</body>
+</html>

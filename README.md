@@ -641,3 +641,70 @@ contextBridge.exposeInMainWorld('listeners', {
   })
 </script>
 ```
+
+### 4.2 全局监听
+
+全局监听快捷键是无论程序当前是否处于激活状态都能触发的监听。
+
+下面来看一下具体的使用方法：
+
+首先，在 **主进程** 中引入 `globalShortcut` 模块，这个模块可以用来注册全局快捷键监听事件。
+
+同样地，在窗口创建完成之后，调用 `globalShortcut.register()` 方法注册一个监听事件：
+
+```js
+const createWindow = () => {
+	const win = new BrowserWindow({
+		width: 800,
+		height: 600,
+		webPreferences: {
+			preload: path.join(__dirname, 'preload.js')
+		}
+	})
+	win.loadFile("index.html")
+
+	// 注册全局键盘快捷键监听事件
+	globalShortcut.register("Alt+CommandOrControl+G", () => {
+		// 通知渲染进程处理事件
+		win.webContents.send('globalShortcut:Alt+CommandOrControl+G')
+
+	})
+
+}
+```
+
+这里监听的是 windows / linux 系统下的 `Alt + Control + G` 快捷键以及 macos 系统下的 `Alt + Command + G` 快捷键。
+
+在处理函数中，还是一样通过 `win.webContents` 往 **渲染进程** 中发送一个事件。
+
+
+
+在预处理脚本中，借助 `ipcRenderer` 监听从 **主进程** 发送的键盘快捷键事件，并调用 **渲染进程** 传递过来的回调函数：
+
+```js
+const { contextBridge, ipcRenderer } = require('electron')
+
+contextBridge.exposeInMainWorld('globalShortcut', {
+  altControlG(callback = () => {}) { ipcRenderer.on('globalShortcut:Alt+CommandOrControl+G', () => callback && callback()) }
+})
+```
+
+
+
+在 **渲染进程** 中，调用 `altControlG` 函数即可完成监听：
+
+```html
+<body>
+  
+  <h2>测试键盘全局监听快捷键</h2>
+  <h3 id="shortcut-listen-text"></h3>
+
+  <script>
+    const t = document.getElementById('shortcut-listen-text')
+    let count = 0
+    globalShortcut.altControlG(() => {
+      t.innerText = `全局键盘快捷键触发了 ${++count} 次`
+    })
+  </script>
+</body>
+```
