@@ -592,8 +592,52 @@ app.on('window-all-closed', () => process.platform !== 'darwin' && app.quit())
 
 `click` 属性接收一个函数，这个函数就是用户按下组合键或者直接点击子菜单时触发，我们在函数体中通过 `win.webContents` 对象，从**主进程向 win 窗口所在的渲染进程发送一条消息**，表示事件触发。
 
+```javascript
+const createWindow = () => {
+  const win = new BrowserWindow({
+    width: 800,
+    height: 600,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js')
+    }
+  })
+  win.loadFile('index.html')
+  
+  // 创建一个新菜单
+  const menu = Menu.buildFromTemplate([
+    {
+      label: 'Electron',
+      submenu: [{
+        role: 'help',
+        accelerator: process.platform === 'darwin' ? 'Alt+Cmd+I' : 'Alt+Control+I',
+        click() {
+          // 发送一个事件给渲染进程
+          win.webContents.send('help-menu-click')
+        }
+      }]
+    }
+  ])
+  Menu.setApplicationMenu(menu)
+}
 ```
 
+同样地，为了要在渲染进程中监听到主进程发来的消息，需要借助预加载脚本的 `contextBridge` 模块来封装一个辅助监听函数：
+
+```js
+const { contextBridge, ipcRenderer } = require('electron')
+
+contextBridge.exposeInMainWorld('listeners', {
+  onHelpMenuClick(callback = () => {}) { ipcRenderer.on('help-menu-click', callback) }
+})
 ```
 
-同样地，为了要在渲染进程中监听到主进程发来的消息，需要借助预加载脚本的 `contextBridge` 模块来封装一个辅助函数
+最后，在渲染进程中直接调用 `onHelpMenuClick()` 监听器，传递一个回调函数，在回调函数中处理菜单点击事件：
+
+```html
+<script>
+  const tip = document.getElementById('keyboard-event-tip')
+  window.listeners.onHelpMenuClick(() => {
+    tip.innerText = 'Help Menu Triggered!'
+  })
+</script>
+```
