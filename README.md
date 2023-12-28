@@ -708,3 +708,35 @@ contextBridge.exposeInMainWorld('globalShortcut', {
   </script>
 </body>
 ```
+
+### 4.3 使用 Web Api 进行监听
+
+在 **渲染进程** 中，可以直接通过 `window.addEventListener()` 方法来监听键盘快捷键。
+
+监听方法与普通的 web 应用一致，这里不再赘述。
+
+### 4.4 在主进程中拦截键盘输入
+
+当 **渲染进程** 触发了 `keyup` 或者 `keydown` 事件的时候，可以在 **主进程** 中进行拦截并作出相应处理。
+
+同样是在创建出来的窗口对象上，通过 `win.webContents.on()` 方法，监听 `before-input-event` 事件，即可对键盘输入进行拦截
+
+```js
+const createWindow = () => {
+	const win = new BrowserWindow({
+		width: 800,
+		height: 600
+	})
+	win.loadFile("index.html")
+
+	// 拦截键盘输入
+	win.webContents.on('before-input-event', (event, input) => {
+		if (input.control && input.key.toLowerCase() === 'i') {
+			console.log('Press Control+I')
+			event.preventDefault()
+		}
+
+	})
+	
+}
+```

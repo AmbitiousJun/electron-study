@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>测试主进程拦截键盘输入</title>
+</head>
+<body>
+  
+  <h2>测试主进程拦截键盘输入</h2>
+  <h3 id="input-text"></h3>
+
+  <script>
+    const it = document.getElementById('input-text')
+    window.addEventListener('keyup', e => {
+      it.innerText = `监听到你按下了 ${e.key} 键`
+    })
+
+  </script>
+
+</body>
+</html>
